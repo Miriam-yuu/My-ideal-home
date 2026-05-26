@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【美居生活圈】雙人通勤精準配對系統 - 原型演示</title>
+    <!-- Leaflet CSS 地圖套件 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #2b6cb0;
+            --primary-light: #ebf8ff;
+            --accent: #319795;
+            --dark: #2d3748;
+            --gray: #718096;
+            --light: #f7fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background-color: var(--light);
+            color: var(--dark);
+            overflow: hidden;
+        }
+
+        /* 左側控制面板 */
+        .sidebar {
+            width: 400px;
+            background: white;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .header {
+            padding: 24px;
+            background: var(--primary);
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header p {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .content {
+            padding: 24px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            margin-top: 8px;
+        }
+
+        .input-group {
+            background: var(--light);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .input-group.partner {
+            border-left-color: var(--accent);
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .range-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--gray);
+        }
+
+        .btn-calc {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 12px;
+            box-shadow: 0 4px 6px rgba(43, 108, 176, 0.2);
+        }
+
+        .btn-calc:hover {
+            background: #2b6cb0;
+            opacity: 0.9;
+        }
+
+        /* 建議物件列表 */
+        .results-box {
+            margin-top: 24px;
+            display: none;
+        }
+
+        .house-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .house-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .house-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .house-info {
+            font-size: 13px;
+            color: var(--gray);
+            margin-bottom: 8px;
+        }
+
+        .house-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .tag-time-a { background: var(--primary-light); color: var(--primary); }
+        .tag-time-b { background: #e6fffa; color: var(--accent); }
+        .tag-price { background: #fff5f5; color: #e53e3e; }
+
+        /* 右側地圖區域 */
+        #map {
+            flex: 1;
+            height: 100%;
+        }
+
+        /* 隱私聲明/圖例 */
+        .legend {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .color-box { width: 16px; height: 16px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <!-- 左側控制面板 -->
+    <div class="sidebar">
+        <div class="header">
+            <h1>📍 雙人通勤精準配對系統</h1>
+            <p>輸入雙方工作地，一鍵算出生產力最高的黃金居住圈</p>
+        </div>
+        <div class="content">
+            <div class="section-title">Step 1. 輸入通勤起點</div>
+            
+            <!-- 使用者 A -->
+            <div class="input-group">
+                <label>👤 先生/使用者 A 的工作地</label>
+                <select id="locA">
+                    <option value="neihu">內湖科技園區 (開車族)</option>
+                    <option value="xinyi">信義計劃區 (搭捷運)</option>
+                    <option value="nangang">南港軟體園區 (搭捷運)</option>
+                </select>
+                <div class="range-container">
+                    <span>可忍受極限通勤時間:</span>
+                    <span id="valA">35 分鐘</span>
+                </div>
+                <input type="range" id="timeA" min="15" max="60" value="35" oninput="document.getElementById('valA').innerText=this.value+' 分鐘'">
+            </div>
+
+            <!-- 使用者 B -->
+            <div class="input-group partner">
+                <label>👤 太太/使用者 B 的工作地</label>
+                <select id="locB">
+                    <option value="main_station">台北車站周邊 (搭捷運)</option>
+                    <option value="guting">古亭/師大商圈 (搭捷運)</option>
+                    <option value="hsinchu" disabled>新竹科學園區 (測試跨區)</option>
+                </select>
+                <div class="range-container">
+                    <span>可忍受極限通勤時間:</span>
+                    <span id="valB">35 分鐘</span>
+                </div>
+                <input type="range" id="timeB" min="15" max="60" value="35" oninput="document.getElementById('valB').innerText=this.value+' 分鐘'">
+            </div>
+
+            <button class="btn-calc" onclick="calculateCommute()">⚡ 開始智能交叉配對</button>
+
+            <!-- 建議物件結果 -->
+            <div class="results-box" id="resultsBox">
+                <div class="section-title">Step 2. 黃金交集圈推薦物件</div>
+                <div id="houseList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側地圖 -->
+    <div id="map"></div>
+
+    <!-- 地圖圖例 -->
+    <div class="legend">
+        <div class="legend-item"><div class="color-box" style="background: #2b6cb0;"></div> 先生工作地</div>
+        <div class="legend-item"><div class="color-box" style="background: #319795;"></div> 太太工作地</div>
+        <div class="legend-item"><div class="color-box" style="background: rgba(72, 187, 120, 0.2); border: 2px solid #48bb78;"></div> 雙人通勤黃金交集圈</div>
+        <div class="legend-item"><div class="color-box" style="background: #ff9800;"></div> 精選在售/在租物件</div>
+    </div>
+
+    <!-- Leaflet JS 地圖套件 -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 初始化地圖（預設中心點設在台北市中心）
+        const map = L.map('map').setView([25.0478, 121.5320], 13);
+        
+        // 使用 OpenStreetMap 免費地圖磚
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 定義模擬的地標座標
+        const coordinates = {
+            neihu: [25.0798, 121.5746],       // 內科
+            xinyi: [25.0334, 121.5642],       // 信義區
+            nangang: [25.0592, 121.6143],     // 南港軟體園區
+            main_station: [25.0478, 121.5170], // 台北車站
+            guting: [25.0263, 121.5226]        // 古亭
+        };
+
+        // 模擬的公司房屋庫存數據
+        const mockHouses = [
+            { name: "大直植福精選美寓", coords: [25.0815, 121.5540], price: "2,880 萬", timeA: 12, timeB: 22, desc: "捷運大直站走路5分鐘，高質感純住宅區。" },
+            { name: "民生社區林蔭三房", coords: [25.0605, 121.5580], price: "3,200 萬", timeA: 18, timeB: 20, desc: "經典民生社區環境，雙面採光，機能絕佳。" },
+            { name: "松江南京百萬夜景戶", coords: [25.0520, 121.5330], price: "2,450 萬", timeA: 25, timeB: 10, desc: "雙捷運交會核心，通勤極速，收租自用皆宜。" },
+            { name: "中山區晴光高投報兩房", coords: [25.0640, 121.5245], price: "1,980 萬", timeA: 22, timeB: 15, desc: "晴光商圈生活機能極強，頂客族最愛。" },
+            { name: "象山世外桃源露臺戶", coords: [25.0270, 121.5710], price: "3,500 萬", timeA: 28, timeB: 25, desc: "信義區旁靜巷，自帶大露臺，空氣採光好。" }
+        ];
+
+        let layerGroup = L.layerGroup().addTo(map);
+
+        function calculateCommute() {
+            // 清除上一筆搜尋的地圖標記
+            layerGroup.clearLayers();
+
+            const locA = document.getElementById('locA').value;
+            const locB = document.getElementById('locB').value;
+            const maxTimeA = parseInt(document.getElementById('timeA').value);
+            const maxTimeB = parseInt(document.getElementById('timeB').value);
+
+            const coordA = coordinates[locA];
+            const coordB = coordinates[locB];
+
+            // 1. 標記工作地 A (先生)
+            L.circleMarker(coordA, { color: '#2b6cb0', fillColor: '#2b6cb0', fillOpacity: 0.8, radius: 10 })
+                .addTo(layerGroup).bindPopup("<b>👤 先生工作起點</b>").openPopup();
+
+            // 2. 標記工作地 B (太太)
+            L.circleMarker(coordB, { color: '#319795', fillColor: '#319795', fillOpacity: 0.8, radius: 10 })
+                .addTo(layerGroup).bindPopup("<b>👤 太太工作起點</b>");
+
+            // 3. 計算並畫出雙人通勤的「交集黃金圈」 (此處為模擬演算法：計算兩點的中心點並繪製交集視覺效果)
+            const centerLat = (coordA[0] + coordB[0]) / 2;
+            const centerLng = (coordA[1] + coordB[1]) / 2;
+            
+            // 根據兩人設定的忍受時間調整交集圈半徑 (時間越長、半徑越大)
+            const averageTime = (maxTimeA + maxTimeB) / 2;
+            const radiusInMeters = averageTime * 95; 
+
+            const overlapCircle = L.circle([centerLat, centerLng], {
+                color: '#48bb78',
+                fillColor: '#48bb78',
+                fillOpacity: 0.15,
+                radius: radiusInMeters,
+                dashArray: '5, 5'
+            }).addTo(layerGroup);
+
+            // 將地圖視角縮放到涵蓋整個交集圈
+            map.fitBounds(overlapCircle.getBounds(), { padding: [50, 50] });
+
+            // 4. 篩選符合通勤時間的房屋物件並渲染列表
+            const houseListDiv = document.getElementById('houseList');
+            houseListDiv.innerHTML = '';
+            let matchCount = 0;
+
+            mockHouses.forEach(house => {
+                // 模擬篩選：檢查該物件對兩人的通勤時間是否在限制內
+                if (house.timeA <= maxTimeA && house.timeB <= maxTimeB) {
+                    matchCount++;
+                    
+                    // 地圖上標記房屋
+                    const houseMarker = L.marker(house.coords, {
+                        icon: L.divIcon({
+                            className: 'custom-div-icon',
+                            html: "<div style='background-color:#ff9800; width:14px; height:14px; border-radius:50%; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);'></div>",
+                            iconSize: [14, 14]
+                        })
+                    }).addTo(layerGroup);
+
+                    houseMarker.bindPopup(`<b>${house.name}</b><br>總價：${house.price}<br>👨 先生通勤：${house.timeA}分鐘<br>👩 太太通勤：${house.timeB}分鐘`);
+
+                    // 左側列表新增卡片
+                    const card = document.createElement('div');
+                    card.className = 'house-card';
+                    card.innerHTML = `
+                        <div class="house-title">${house.name}</div>
+                        <div class="house-info">${house.desc}</div>
+                        <div class="house-tags">
+                            <span class="tag tag-time-a">👨 先生 ${house.timeA} 分</span>
+                            <span class="tag tag-time-b">👩 太太 ${house.timeB} 分</span>
+                            <span class="tag tag-price">💰 ${house.price}</span>
+                        </div>
+                    `;
+                    
+                    // 點擊左側卡片，地圖會自動飛過去並打開氣泡窗
+                    card.onclick = () => {
+                        map.flyTo(house.coords, 15);
+                        houseMarker.openPopup();
+                    };
+
+                    houseListDiv.appendChild(card);
+                }
+            });
+
+            if(matchCount === 0) {
+                houseListDiv.innerHTML = '<p style="color:var(--gray); font-size:14px; text-align:center; padding:20px;">此通勤條件下暫無符合的黃金交集物件，建議放寬通勤時間試試！</p>';
+            }
+
+            // 顯示結果區塊
+            document.getElementById('resultsBox').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
