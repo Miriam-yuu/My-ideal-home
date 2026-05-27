@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>【美居生活圈】雙人通勤精準配對系統 - 原型演示</title>
+    <title>【我的理想生活圈】雙人通勤精準配對系統</title>
     <!-- Leaflet CSS 地圖套件 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
@@ -88,14 +88,17 @@
             border-left-color: var(--accent);
         }
 
-        .input-group label {
+        .input-group label, .input-group input[type="text"] {
             display: block;
+        }
+
+        .input-group label {
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 8px;
         }
 
-        select, input[type="range"] {
+        select, input[type="range"], input[type="text"] {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid #e2e8f0;
@@ -104,6 +107,15 @@
             font-size: 14px;
             margin-bottom: 8px;
         }
+
+        .filter-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .filter-row input { margin-bottom: 0; }
+        .filter-label { font-size: 12px; color: var(--gray); margin-bottom: 4px; }
 
         .range-container {
             display: flex;
@@ -183,6 +195,7 @@
         .tag-time-a { background: var(--primary-light); color: var(--primary); }
         .tag-time-b { background: #e6fffa; color: var(--accent); }
         .tag-price { background: #fff5f5; color: #e53e3e; }
+        .tag-amenity { background: #edf2f7; color: #4a5568; }
 
         /* 右側地圖區域 */
         #map {
@@ -222,11 +235,15 @@
             
             <!-- 使用者 A -->
             <div class="input-group">
-                <label>👤 先生/使用者 A 的工作地</label>
-                <select id="locA">
-                    <option value="neihu">內湖科技園區 (開車族)</option>
-                    <option value="xinyi">信義計劃區 (搭捷運)</option>
-                    <option value="nangang">南港軟體園區 (搭捷運)</option>
+                <label>👤 先生/使用者 A 的工作地 (地址)</label>
+                <input type="text" id="addressA" placeholder="輸入詳細地址..." value="台北市內湖區瑞光路">
+                <label>🛵 交通方式</label>
+                <select id="modeA">
+                    <option value="driving">開車</option>
+                    <option value="motorcycling">騎車</option>
+                    <option value="transit" selected>大眾運輸</option>
+                    <option value="cycling">自行車</option>
+                    <option value="walking">步行</option>
                 </select>
                 <div class="range-container">
                     <span>可忍受極限通勤時間:</span>
@@ -237,11 +254,15 @@
 
             <!-- 使用者 B -->
             <div class="input-group partner">
-                <label>👤 太太/使用者 B 的工作地</label>
-                <select id="locB">
-                    <option value="main_station">台北車站周邊 (搭捷運)</option>
-                    <option value="guting">古亭/師大商圈 (搭捷運)</option>
-                    <option value="hsinchu" disabled>新竹科學園區 (測試跨區)</option>
+                <label>👤 太太/使用者 B 的工作地 (地址)</label>
+                <input type="text" id="addressB" placeholder="輸入詳細地址..." value="台北車站">
+                <label>🚇 交通方式</label>
+                <select id="modeB">
+                    <option value="driving">開車</option>
+                    <option value="motorcycling">騎車</option>
+                    <option value="transit" selected>大眾運輸</option>
+                    <option value="cycling">自行車</option>
+                    <option value="walking">步行</option>
                 </select>
                 <div class="range-container">
                     <span>可忍受極限通勤時間:</span>
@@ -250,11 +271,73 @@
                 <input type="range" id="timeB" min="15" max="60" value="35" oninput="document.getElementById('valB').innerText=this.value+' 分鐘'">
             </div>
 
-            <button class="btn-calc" onclick="calculateCommute()">⚡ 開始智能交叉配對</button>
+            <!-- Step 2: 物件基本資料 -->
+            <div class="section-title">Step 2. 物件基本資料篩選</div>
+            <div class="input-group" style="border-left-color: #cbd5e0; background: #fff; border: 1px solid #e2e8f0;">
+                <label>🏠 住宅用途</label>
+                <select id="filterPurpose">
+                    <option value="all">不限</option>
+                    <option value="住宅">住宅</option>
+                    <option value="店面">店面</option>
+                    <option value="辦公">辦公</option>
+                    <option value="其他">其他</option>
+                </select>
+
+                <div class="filter-label">💰 總價範圍 (萬元)</div>
+                <div class="filter-row">
+                    <input type="number" id="minPrice" placeholder="最小">
+                    <span>-</span>
+                    <input type="number" id="maxPrice" placeholder="最大">
+                </div>
+
+                <div class="filter-label">📐 坪數範圍</div>
+                <div class="filter-row">
+                    <input type="number" id="minSize" placeholder="最小">
+                    <span>-</span>
+                    <input type="number" id="maxSize" placeholder="最大">
+                </div>
+
+                <div class="filter-label">📅 屋齡範圍 (年)</div>
+                <div class="filter-row">
+                    <input type="number" id="minAge" placeholder="最小">
+                    <span>-</span>
+                    <input type="number" id="maxAge" placeholder="最大">
+                </div>
+
+                <div class="filter-label">🛌 格局 (房/廳/衛 至少)</div>
+                <div class="filter-row">
+                    <input type="number" id="minRoom" placeholder="房">
+                    <input type="number" id="minHall" placeholder="廳">
+                    <input type="number" id="minBath" placeholder="衛">
+                </div>
+
+                <div class="filter-label">🏢 樓層 / 總樓高 (至少)</div>
+                <div class="filter-row">
+                    <input type="number" id="minFloor" placeholder="樓層">
+                    <input type="number" id="minTotalFloor" placeholder="總高">
+                </div>
+            </div>
+
+            <div class="section-title">Step 3. 生活機能需求 (可複選)</div>
+            <div class="amenity-container">
+                <input type="checkbox" id="store" name="amenity" value="便利商店" class="amenity-checkbox"><label for="store" class="amenity-label">🏪 便利商店</label>
+                <!-- 大型賣場改為全聯 -->
+                <input type="checkbox" id="mall" name="amenity" value="全聯" class="amenity-checkbox"><label for="mall" class="amenity-label">🛒 全聯</label>
+                <!-- 健身房改為健身房、運動中心 -->
+                <input type="checkbox" id="gym" name="amenity" value="健身房、運動中心" class="amenity-checkbox"><label for="gym" class="amenity-label">💪 健身房、運動中心</label>
+                <input type="checkbox" id="park" name="amenity" value="公園綠地" class="amenity-checkbox"><label for="park" class="amenity-label">🌳 公園綠地</label>
+                <input type="checkbox" id="school" name="amenity" value="優質學區" class="amenity-checkbox"><label for="school" class="amenity-label">🏫 優質學區</label>
+                <input type="checkbox" id="hospital" name="amenity" value="醫療機構" class="amenity-checkbox"><label for="hospital" class="amenity-label">🏥 醫療機構</label>
+                <input type="checkbox" id="mrt" name="amenity" value="捷運站旁" class="amenity-checkbox"><label for="mrt" class="amenity-label">🚇 捷運站旁</label>
+                <input type="checkbox" id="dept" name="amenity" value="百貨商圈" class="amenity-checkbox"><label for="dept" class="amenity-label">🛍️ 百貨商圈</label>
+                <input type="checkbox" id="parking" name="amenity" value="停車方便" class="amenity-checkbox"><label for="parking" class="amenity-label">🚗 停車方便</label>
+            </div>
+
+            <button class="btn-calc" onclick="calculateCommute()">⚡ 開始智能精準配對</button>
 
             <!-- 建議物件結果 -->
             <div class="results-box" id="resultsBox">
-                <div class="section-title">Step 2. 黃金交集圈推薦物件</div>
+                <div class="section-title">Step 4. 黃金交集圈推薦物件</div>
                 <div id="houseList"></div>
             </div>
         </div>
@@ -282,37 +365,195 @@
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // 定義模擬的地標座標
-        const coordinates = {
-            neihu: [25.0798, 121.5746],       // 內科
-            xinyi: [25.0334, 121.5642],       // 信義區
-            nangang: [25.0592, 121.6143],     // 南港軟體園區
-            main_station: [25.0478, 121.5170], // 台北車站
-            guting: [25.0263, 121.5226]        // 古亭
+        // 定義生活機能 POI 資料庫 (座標範例)
+        const POI_DATA = {
+            "公園綠地": [[25.0324, 121.5348], [25.0631, 121.5434], [25.0741, 121.5786], [25.0531, 121.6164], [25.0267, 121.5147]],
+            "捷運站旁": [[25.0462, 121.5174], [25.0329, 121.5654], [25.0599, 121.6145], [25.0813, 121.5645], [25.0263, 121.5226]],
+            "百貨商圈": [[25.0356, 121.5662], [25.0524, 121.5204], [25.0833, 121.5559], [25.0452, 121.5452]],
+            "全聯": [
+                [25.0422, 121.5332], [25.0515, 121.5455], [25.0356, 121.5662], [25.0267, 121.5226], 
+                [25.0478, 121.5170], [25.0815, 121.5540], [25.0605, 121.5580], [25.0640, 121.5245], 
+                [25.0270, 121.5710], [25.0125, 121.4655], [25.0024, 121.4692], [24.9913, 121.5187], 
+                [24.9816, 121.4890], [24.9991, 121.5433], [24.9850, 121.5640], [24.9652, 121.5428], 
+                [25.0505, 121.4431], [25.0548, 121.4600], [24.9863, 121.4510], [25.0502, 121.6190], 
+                [25.0378, 121.6171], [25.1065, 121.5205], [25.1297, 121.4710], [25.0764, 121.5758], 
+                [25.0400, 121.5561], [25.084, 121.558], [25.115, 121.523], [25.033, 121.565], [25.046, 121.517]
+            ],
+            "醫療機構": [[25.0420, 121.5180], [25.0590, 121.5230], [25.0490, 121.5890]],
+            "優質學區": [[25.0270, 121.5300], [25.0680, 121.5500], [25.0400, 121.5700]]
         };
 
-        // 模擬的公司房屋庫存數據
-        const mockHouses = [
-            { name: "大直植福精選美寓", coords: [25.0815, 121.5540], price: "2,880 萬", timeA: 12, timeB: 22, desc: "捷運大直站走路5分鐘，高質感純住宅區。" },
-            { name: "民生社區林蔭三房", coords: [25.0605, 121.5580], price: "3,200 萬", timeA: 18, timeB: 20, desc: "經典民生社區環境，雙面採光，機能絕佳。" },
-            { name: "松江南京百萬夜景戶", coords: [25.0520, 121.5330], price: "2,450 萬", timeA: 25, timeB: 10, desc: "雙捷運交會核心，通勤極速，收租自用皆宜。" },
-            { name: "中山區晴光高投報兩房", coords: [25.0640, 121.5245], price: "1,980 萬", timeA: 22, timeB: 15, desc: "晴光商圈生活機能極強，頂客族最愛。" },
-            { name: "象山世外桃源露臺戶", coords: [25.0270, 121.5710], price: "3,500 萬", timeA: 28, timeB: 25, desc: "信義區旁靜巷，自帶大露臺，空氣採光好。" }
-        ];
+        // 預設其他機能(便利商店、傳統市場等)由於密度極高，在原型中設定為較易達成
+        const COMMON_AMENITIES = ["便利商店", "健身房、運動中心", "停車方便"];
+
+        let realHouseData = [];
+
+        // 讀取「上市明細.json」
+        async function loadListingData() {
+            try {
+                const response = await fetch('上市明細.json');
+                if (!response.ok) throw new Error('無法讀取資料檔案');
+                realHouseData = await response.json();
+                console.log('已成功載入資料:', realHouseData.length, '筆');
+            } catch (error) {
+                console.error('載入資料出錯:', error);
+                alert('請確保「上市明細.json」存在於同目錄，並使用 HTTP Server (如 Live Server) 開啟此頁面。');
+            }
+        }
+        loadListingData();
+
+        // 解析 HouseType (例如: "3房2廳2衛")
+        function parseHouseType(str) {
+            if (!str) return { room: 0, hall: 0, bath: 0 };
+            const room = str.match(/(\d+)房/)?.[1] || 0;
+            const hall = str.match(/(\d+)廳/)?.[1] || 0;
+            const bath = str.match(/(\d+)衛/)?.[1] || 0;
+            return { room: parseInt(room), hall: parseInt(hall), bath: parseInt(bath) };
+        }
+
+        // 解析樓層 (例如: "3~3/5")
+        function parseFloor(str) {
+            if (!str) return { start: 0, total: 0 };
+            const matches = str.match(/(-?\d+)/g);
+            if (!matches) return { start: 0, total: 0 };
+            
+            if (matches.length === 1) { // 單一樓層 (如: 透天 1 樓)
+                const f = parseInt(matches[0]);
+                return { start: f, total: f };
+            }
+            
+            return { 
+                start: parseInt(matches[0]), 
+                total: parseInt(matches[matches.length - 1]) 
+            };
+        }
+
+        // 使用 Nominatim API 進行地址解析 (Geocoding)
+        async function getCoordinates(address) {
+            if (!address) return null;
+
+            // 1. 預處理：移除「里」資訊，Nominatim 對里的相容性極差，移除後成功率會大幅提升
+            let cleanAddress = address.replace(/[^\s]{1,3}里/g, '');
+
+            async function fetchFromAPI(query) {
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=tw&limit=1`);
+                    const data = await response.json();
+                    return (data && data.length > 0) ? [parseFloat(data[0].lat), parseFloat(data[0].lon)] : null;
+                } catch (e) { return null; }
+            }
+
+            // 嘗試路徑 A: 預處理後的地址 (推薦)
+            let result = await fetchFromAPI(cleanAddress);
+            if (result) return result;
+
+            // 嘗試路徑 B: 原始輸入 (萬一預處理壞了)
+            if (cleanAddress !== address) {
+                result = await fetchFromAPI(address);
+                if (result) return result;
+            }
+
+            // 嘗試路徑 C: 寬鬆搜尋 (只抓路名，移除號碼與樓層)
+            // 這樣至少能定位在該路段，不會讓整個功能卡住
+            let roadOnly = cleanAddress.replace(/\d+號.*/, '');
+            if (roadOnly !== cleanAddress) {
+                result = await fetchFromAPI(roadOnly);
+            }
+
+            return result;
+        }
+
+        // 計算經緯度直線距離並估算通勤分鐘數
+        function estimateCommuteTime(coord1, coord2, mode) {
+            const p1 = L.latLng(coord1[0], coord1[1]);
+            const p2 = L.latLng(coord2[0], coord2[1]);
+            const distanceKm = p1.distanceTo(p2) / 1000;
+            
+            // 根據交通工具設定不同的速率 (分鐘/公里) 與 緩衝時間 (分鐘)
+            let factor = 3.5; // 預設
+            let buffer = 5;
+            
+            if (mode === 'driving') {
+                factor = 2.5; // 開車較快但需找車位
+                buffer = 8;
+            } else if (mode === 'motorcycling') {
+                factor = 2.0; // 騎車在市區最靈活
+                buffer = 3;
+            } else if (mode === 'transit') {
+                factor = 4.5; // 大眾運輸需步行與候車
+                buffer = 10;
+            } else if (mode === 'cycling') {
+                factor = 4.0; // 自行車速率穩定
+                buffer = 2;
+            } else if (mode === 'walking') {
+                factor = 12.0; // 步行速率約 5km/h
+                buffer = 1;
+            }
+            
+            return Math.round(distanceKm * factor + buffer);
+        }
+
+        // 檢查物件周邊是否有指定機能 (800公尺內)
+        function getNearbyAmenities(houseCoords) {
+            const found = [];
+            const houseLatLng = L.latLng(houseCoords[0], houseCoords[1]);
+
+            for (const [type, locations] of Object.entries(POI_DATA)) {
+                const isNear = locations.some(loc => houseLatLng.distanceTo(L.latLng(loc[0], loc[1])) <= 800);
+                if (isNear) found.push(type);
+            }
+            
+            // 模擬一般機能 (隨機分配以增加多樣性)
+            COMMON_AMENITIES.forEach(a => { if(Math.random() > 0.3) found.push(a); });
+            
+            return [...new Set(found)];
+        }
 
         let layerGroup = L.layerGroup().addTo(map);
 
-        function calculateCommute() {
-            // 清除上一筆搜尋的地圖標記
-            layerGroup.clearLayers();
-
-            const locA = document.getElementById('locA').value;
-            const locB = document.getElementById('locB').value;
+        async function calculateCommute() {
+            const addrA = document.getElementById('addressA').value;
+            const addrB = document.getElementById('addressB').value;
+            const modeA = document.getElementById('modeA').value;
+            const modeB = document.getElementById('modeB').value;
             const maxTimeA = parseInt(document.getElementById('timeA').value);
             const maxTimeB = parseInt(document.getElementById('timeB').value);
 
-            const coordA = coordinates[locA];
-            const coordB = coordinates[locB];
+            // 取得物件篩選條件 (非必填：若為空則設為 0 或 Infinity)
+            const filterPurpose = document.getElementById('filterPurpose').value;
+            const minPrice = parseFloat(document.getElementById('minPrice').value) || 0;
+            const maxPrice = parseFloat(document.getElementById('maxPrice').value) || Infinity;
+            const minSize = parseFloat(document.getElementById('minSize').value) || 0;
+            const maxSize = parseFloat(document.getElementById('maxSize').value) || Infinity;
+            const minAge = parseFloat(document.getElementById('minAge').value) || 0;
+            const maxAge = parseFloat(document.getElementById('maxAge').value) || Infinity;
+            const minRoom = parseInt(document.getElementById('minRoom').value) || 0;
+            const minHall = parseInt(document.getElementById('minHall').value) || 0;
+            const minBath = parseInt(document.getElementById('minBath').value) || 0;
+            const minFloor = parseInt(document.getElementById('minFloor').value) || -99;
+            const minTotalFloor = parseInt(document.getElementById('minTotalFloor').value) || 0;
+
+            if (!addrA || !addrB) {
+                alert("請輸入雙方的工作地地址！");
+                return;
+            }
+
+            const coordA = await getCoordinates(addrA);
+            if (!coordA) {
+                alert(`無法解析先生的地址：\n"${addrA}"\n\n建議移除「里」或簡化門牌號碼試試。`);
+                return;
+            }
+            
+            // 強制延遲 1.1 秒，以符合 Nominatim 每秒僅限 1 次請求的政策
+            await new Promise(resolve => setTimeout(resolve, 1100));
+            
+            const coordB = await getCoordinates(addrB);
+            if (!coordB) {
+                alert(`無法解析太太的地址：\n"${addrB}"\n\n建議移除「里」或簡化門牌號碼試試。`);
+                return;
+            }
+
+            layerGroup.clearLayers();
 
             // 1. 標記工作地 A (先生)
             L.circleMarker(coordA, { color: '#2b6cb0', fillColor: '#2b6cb0', fillOpacity: 0.8, radius: 10 })
@@ -325,6 +566,7 @@
             // 3. 計算並畫出雙人通勤的「交集黃金圈」 (此處為模擬演算法：計算兩點的中心點並繪製交集視覺效果)
             const centerLat = (coordA[0] + coordB[0]) / 2;
             const centerLng = (coordA[1] + coordB[1]) / 2;
+            const circleCenter = L.latLng(centerLat, centerLng);
             
             // 根據兩人設定的忍受時間調整交集圈半徑 (時間越長、半徑越大)
             const averageTime = (maxTimeA + maxTimeB) / 2;
@@ -338,52 +580,133 @@
                 dashArray: '5, 5'
             }).addTo(layerGroup);
 
-            // 將地圖視角縮放到涵蓋整個交集圈
-            map.fitBounds(overlapCircle.getBounds(), { padding: [50, 50] });
-
-            // 4. 篩選符合通勤時間的房屋物件並渲染列表
+            // 4. 篩選符合通勤時間與生活機能的房屋物件
             const houseListDiv = document.getElementById('houseList');
             houseListDiv.innerHTML = '';
             let matchCount = 0;
+            const selectedAmenities = Array.from(document.querySelectorAll('input[name="amenity"]:checked')).map(el => el.value);
 
-            mockHouses.forEach(house => {
-                // 模擬篩選：檢查該物件對兩人的通勤時間是否在限制內
-                if (house.timeA <= maxTimeA && house.timeB <= maxTimeB) {
+            // 用於縮放地圖的座標點集合
+            const boundsPoints = [coordA, coordB];
+
+            realHouseData.forEach(item => {
+                // 1. 座標有效性檢查：過濾掉 0,0 或無效的經緯度
+                const lat = parseFloat(item.coordinatey2);
+                const lng = parseFloat(item.coordinatex2);
+                
+                if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                    return; // 略過座標無效的物件
+                }
+
+                const houseCoords = [lat, lng];
+                const houseLatLng = L.latLng(lat, lng);
+
+                // 嚴格過濾：若物件經緯度不在「黃金交集圈」圓圈內，則不顯示
+                if (houseLatLng.distanceTo(circleCenter) > radiusInMeters) return;
+
+                // A. 物件基本資料篩選
+                const price = parseFloat(item.開價) || 0;
+                const size = item.坪數 === "NULL" ? 0 : parseFloat(item.坪數);
+                const age = item.屋齡 === "NULL" ? 0 : parseFloat(item.屋齡);
+                const hType = parseHouseType(item.HouseType);
+                const floorInfo = parseFloor(item.樓層);
+
+                const basicMatch = 
+                    (filterPurpose === 'all' || item.住宅用途 === filterPurpose) &&
+                    (price >= minPrice && price <= maxPrice) &&
+                    (size >= minSize && size <= maxSize) &&
+                    (age >= minAge && age <= maxAge) &&
+                    (hType.room >= minRoom && hType.hall >= minHall && hType.bath >= minBath) &&
+                    (floorInfo.start >= minFloor && floorInfo.total >= minTotalFloor);
+
+                if (!basicMatch) return;
+
+                // B. 通勤時間篩選
+                // 動態計算通勤時間
+                const timeA = estimateCommuteTime(houseCoords, coordA, modeA);
+                const timeB = estimateCommuteTime(houseCoords, coordB, modeB);
+
+                // C. 生活機能篩選
+                const detectedAmenities = getNearbyAmenities(houseCoords);
+                
+                const timeMatch = timeA <= maxTimeA && timeB <= maxTimeB;
+                const amenityMatch = selectedAmenities.every(val => detectedAmenities.includes(val));
+
+                // 只有符合黃金交叉的才進入顯示邏輯
+                if (timeMatch && amenityMatch) {
                     matchCount++;
+                    boundsPoints.push(houseCoords);
                     
-                    // 地圖上標記房屋
-                    const houseMarker = L.marker(house.coords, {
+                    const houseMarker = L.marker(houseCoords, {
                         icon: L.divIcon({
                             className: 'custom-div-icon',
-                            html: "<div style='background-color:#ff9800; width:14px; height:14px; border-radius:50%; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);'></div>",
+                            // 根據住宅用途給予不同視覺提示
+                            html: `<div style='background-color:${item.住宅用途 === "店面" ? "#e53e3e" : "#ff9800"}; 
+                                   width:14px; height:14px; border-radius:50%; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3);'></div>`,
                             iconSize: [14, 14]
                         })
                     }).addTo(layerGroup);
 
-                    houseMarker.bindPopup(`<b>${house.name}</b><br>總價：${house.price}<br>👨 先生通勤：${house.timeA}分鐘<br>👩 太太通勤：${house.timeB}分鐘`);
+                    // 根據你提供的 JSON 欄位進行精確對應
+                    const title = `${item.住宅用途 || ''} ${item.大樓名稱 || item.地址 || '上市物件'}`;
+                    const displayPrice = item.開價 ? `${item.開價} 萬` : "價格請洽原始網頁";
+                    
+                    // 3. 抓取 JSON 中的「網址」欄位
+                    const url = item.網址 || "#"; 
 
-                    // 左側列表新增卡片
+                    // 建立規格簡介字串
+                    const houseSpecs = `${item.HouseType || '規格未填'} | ${item.坪數 === "NULL" ? "坪數不詳" : item.坪數 + " 坪"} | ${item.屋齡 === "NULL" ? "新成屋" : item.屋齡 + " 年"} | ${item.樓層 || '樓層未填'}`;
+
+                    houseMarker.bindPopup(`
+                        <b>${title}</b><br>
+                        總價：${displayPrice}<br>
+                        規格：${houseSpecs}<br>
+                        👨 先生：約 ${timeA} 分鐘<br>
+                        👩 太太：約 ${timeB} 分鐘<br>
+                        ✨ 機能：${detectedAmenities.slice(0, 3).join(', ')}...<br>
+                        <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:bold; text-decoration:none;">🔗 開啟原始網頁</a>
+                    `);
+
                     const card = document.createElement('div');
                     card.className = 'house-card';
                     card.innerHTML = `
-                        <div class="house-title">${house.name}</div>
-                        <div class="house-info">${house.desc}</div>
+                        <div class="house-title">${title}</div>
+                        <div class="house-info">
+                            ${item.address || item.地址 || '點擊地圖查看位置'}<br>
+                            <span style="color:var(--dark); font-weight:500; font-size:12px;">${houseSpecs}</span>
+                        </div>
                         <div class="house-tags">
-                            <span class="tag tag-time-a">👨 先生 ${house.timeA} 分</span>
-                            <span class="tag tag-time-b">👩 太太 ${house.timeB} 分</span>
-                            <span class="tag tag-price">💰 ${house.price}</span>
+                            <span class="tag tag-time-a">👨 ${timeA} 分</span>
+                            <span class="tag tag-time-b">👩 ${timeB} 分</span>
+                            <span class="tag tag-price">💰 ${displayPrice}</span>
+                            ${detectedAmenities.slice(0, 2).map(a => `<span class="tag tag-amenity">✨ ${a}</span>`).join('')}
+                        </div>
+                        <div style="margin-top:8px;">
+                            <a href="${url}" target="_blank" class="house-link" style="font-size:12px; color:var(--primary); text-decoration:none; font-weight:bold;">查看原始詳情 →</a>
                         </div>
                     `;
                     
-                    // 點擊左側卡片，地圖會自動飛過去並打開氣泡窗
                     card.onclick = () => {
-                        map.flyTo(house.coords, 15);
+                        map.flyTo(houseCoords, 15);
                         houseMarker.openPopup();
+                    };
+
+                    // 4. 重要：防止點擊連結時觸發 card.onclick 的地圖移動
+                    const linkElement = card.querySelector('.house-link');
+                    linkElement.onclick = (e) => {
+                        e.stopPropagation();
                     };
 
                     houseListDiv.appendChild(card);
                 }
             });
+            // ... (其餘地圖縮放與查無物件邏輯)
+
+            // 將地圖視角縮放到涵蓋工作地與所有符合的物件
+            if (boundsPoints.length > 0) {
+                const bounds = L.latLngBounds(boundsPoints);
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
 
             if(matchCount === 0) {
                 houseListDiv.innerHTML = '<p style="color:var(--gray); font-size:14px; text-align:center; padding:20px;">此通勤條件下暫無符合的黃金交集物件，建議放寬通勤時間試試！</p>';
