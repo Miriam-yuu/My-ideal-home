@@ -135,10 +135,36 @@
             border-radius: 8px;
             margin-bottom: 16px;
             border-left: 4px solid var(--primary);
+            position: relative;
         }
 
         .input-group.partner {
             border-left-color: var(--accent);
+        }
+
+        .input-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .btn-remove-user {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: var(--gray);
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+            transition: color 0.2s;
+            padding: 4px;
+            z-index: 5;
+        }
+        .btn-remove-user:hover {
+            color: #e53e3e;
         }
 
         .input-group label, .input-group input[type="text"] {
@@ -349,43 +375,10 @@
             <div id="search-section">
             <div class="section-title">Step 1. 輸入通勤起點</div>
             
-            <!-- 使用者 A -->
-            <div class="input-group">
-                <label>👤 先生/使用者 A 的工作地 (地址)</label>
-                <input type="text" id="addressA" placeholder="輸入詳細地址..." value="台北市內湖區瑞光路">
-                <label>🛵 交通方式</label>
-                <select id="modeA">
-                    <option value="driving">開車</option>
-                    <option value="motorcycling">騎車</option>
-                    <option value="transit" selected>大眾運輸</option>
-                    <option value="cycling">自行車</option>
-                    <option value="walking">步行</option>
-                </select>
-                <div class="range-container">
-                    <span>可忍受極限通勤時間:</span>
-                    <span id="valA">35 分鐘</span>
-                </div>
-                <input type="range" id="timeA" min="15" max="60" value="35" oninput="document.getElementById('valA').innerText=this.value+' 分鐘'">
-            </div>
-
-            <!-- 使用者 B -->
-            <div class="input-group partner">
-                <label>👤 太太/使用者 B 的工作地 (地址)</label>
-                <input type="text" id="addressB" placeholder="輸入詳細地址..." value="台北車站">
-                <label>🚇 交通方式</label>
-                <select id="modeB">
-                    <option value="driving">開車</option>
-                    <option value="motorcycling">騎車</option>
-                    <option value="transit" selected>大眾運輸</option>
-                    <option value="cycling">自行車</option>
-                    <option value="walking">步行</option>
-                </select>
-                <div class="range-container">
-                    <span>可忍受極限通勤時間:</span>
-                    <span id="valB">35 分鐘</span>
-                </div>
-                <input type="range" id="timeB" min="15" max="60" value="35" oninput="document.getElementById('valB').innerText=this.value+' 分鐘'">
-            </div>
+            <!-- 動態使用者輸入區 -->
+            <div id="user-input-container"></div>
+            
+            <button class="btn-calc btn-add-user" id="add-user-btn" onclick="addUser()">➕ 增加參與人員 (最多 4 人)</button>
 
             <!-- Step 2: 物件基本資料 -->
             <div class="section-title">Step 2. 物件基本資料篩選</div>
@@ -471,10 +464,11 @@
 
     <!-- 地圖圖例 -->
     <div class="legend">
-        <div class="legend-item"><div class="color-box" style="background: #2b6cb0;"></div> 先生工作地</div>
-        <div class="legend-item"><div class="color-box" style="background: #319795;"></div> 太太工作地</div>
-        <div class="legend-item"><div class="color-box" style="background: rgba(72, 187, 120, 0.2); border: 2px solid #48bb78;"></div> 雙人通勤黃金交集圈</div>
-        <div class="legend-item"><div class="color-box" style="background: #ff9800;"></div> 精選在售/在租物件</div>
+        <div class="legend-item"><div class="color-box" style="background: #2b6cb0;"></div> 參與人員工作地</div>
+        <div class="legend-item"><div class="color-box" style="background: rgba(72, 187, 120, 0.2); border: 2px solid #48bb78;"></div> 通勤黃金交集圈</div>
+        <div class="legend-item"><div class="color-box" style="background: #ff9800;"></div> 精選住宅物件</div>
+        <div class="legend-item"><div class="color-box" style="background: #e53e3e;"></div> 精選店面物件</div>
+        <div class="legend-item"><div class="color-box" style="background: #cbd5e0;"></div> AI 推薦 (條件略不符)</div>
     </div>
 
     <!-- Leaflet JS 地圖套件 -->
@@ -511,6 +505,86 @@
 
         let realHouseData = [];
         let wishlist = JSON.parse(localStorage.getItem('my_ideal_wishlist')) || [];
+        
+        // 多人設定 (預設 2 人，前兩人固定不可刪)
+        let users = [
+            { id: 1, name: "人員 A", address: "台北市內湖區瑞光路", mode: "transit", time: 35, color: "#2b6cb0" },
+            { id: 2, name: "人員 B", address: "台北車站", mode: "transit", time: 35, color: "#319795" }
+        ];
+        const userColors = ["#2b6cb0", "#319795", "#805ad5", "#d53f8c"]; // 藍、綠、紫、粉
+
+        function renderUserInputs() {
+            const container = document.getElementById('user-input-container');
+            if (!container) return;
+            container.innerHTML = '';
+            users.forEach((user, index) => {
+                const group = document.createElement('div');
+                group.className = 'input-group';
+                group.style.borderLeftColor = user.color;
+                group.innerHTML = `
+                    <div class="input-group-header">
+                        <label>👤 ${user.name} 的工作地</label>
+                        ${index >= 2 ? `<button class="btn-remove-user" onclick="removeUser(${index})">×</button>` : ''}
+                    </div>
+                    <input type="text" class="user-address" data-index="${index}" placeholder="輸入詳細地址..." value="${user.address}">
+                    <label>🚲 交通方式</label>
+                    <select class="user-mode" data-index="${index}">
+                        <option value="driving" ${user.mode === 'driving' ? 'selected' : ''}>開車</option>
+                        <option value="motorcycling" ${user.mode === 'motorcycling' ? 'selected' : ''}>騎車</option>
+                        <option value="transit" ${user.mode === 'transit' ? 'selected' : ''}>大眾運輸</option>
+                        <option value="cycling" ${user.mode === 'cycling' ? 'selected' : ''}>自行車</option>
+                        <option value="walking" ${user.mode === 'walking' ? 'selected' : ''}>步行</option>
+                    </select>
+                    <div class="range-container">
+                        <span>忍受極限通勤:</span>
+                        <span id="val-${index}">${user.time} 分鐘</span>
+                    </div>
+                    <input type="range" class="user-time" data-index="${index}" min="15" max="60" value="${user.time}" 
+                           oninput="document.getElementById('val-${index}').innerText=this.value+' 分鐘'">
+                `;
+                container.appendChild(group);
+            });
+            document.getElementById('add-user-btn').style.display = users.length >= 4 ? 'none' : 'block';
+        }
+
+        function syncUserData() {
+            document.querySelectorAll('#user-input-container .input-group').forEach((group, i) => {
+                const addressInput = group.querySelector('.user-address');
+                const modeSelect = group.querySelector('.user-mode');
+                const timeInput = group.querySelector('.user-time');
+                if (users[i] && addressInput) {
+                    users[i].address = addressInput.value;
+                    users[i].mode = modeSelect.value;
+                    users[i].time = parseInt(timeInput.value);
+                }
+            });
+        }
+
+        function addUser() {
+            if (users.length >= 4) return;
+            syncUserData(); // 在新增前先保存現有輸入內容
+            const nextId = users.length + 1;
+            users.push({ 
+                id: nextId, 
+                name: `人員 ${String.fromCharCode(64 + nextId)}`, 
+                address: "", 
+                mode: "transit", 
+                time: 35, 
+                color: userColors[users.length] 
+            });
+            renderUserInputs();
+        }
+
+        function removeUser(index) {
+            if (index < 2) return; // 第一、二人固定不可刪
+            syncUserData(); // 在刪除前先保存現有輸入內容
+            users.splice(index, 1);
+            users.forEach((u, i) => {
+                u.name = `人員 ${String.fromCharCode(65 + i)}`;
+                u.color = userColors[i];
+            });
+            renderUserInputs();
+        }
 
         // 側邊欄縮放功能
         function toggleSidebar() {
@@ -628,6 +702,7 @@
             }
         }
         loadListingData();
+        renderUserInputs();
 
         // 解析 HouseType (例如: "3房2廳2衛")
         function parseHouseType(str) {
@@ -739,80 +814,68 @@
         let layerGroup = L.layerGroup().addTo(map);
 
         async function calculateCommute() {
-            const addrA = document.getElementById('addressA').value;
-            const addrB = document.getElementById('addressB').value;
-            const modeA = document.getElementById('modeA').value;
-            const modeB = document.getElementById('modeB').value;
-            const maxTimeA = parseInt(document.getElementById('timeA').value);
-            const maxTimeB = parseInt(document.getElementById('timeB').value);
+            // 同步資料至 users 物件
+            syncUserData();
+
+            if (users.some(u => !u.address)) return alert("請填寫所有人的工作地地址！");
 
             // 取得物件篩選條件 (非必填：若為空則設為 0 或 Infinity)
-            const filterPurpose = document.getElementById('filterPurpose').value;
-            const minPrice = parseFloat(document.getElementById('minPrice').value) || 0;
-            const maxPrice = parseFloat(document.getElementById('maxPrice').value) || Infinity;
-            const minSize = parseFloat(document.getElementById('minSize').value) || 0;
-            const maxSize = parseFloat(document.getElementById('maxSize').value) || Infinity;
-            const minAge = parseFloat(document.getElementById('minAge').value) || 0;
-            const maxAge = parseFloat(document.getElementById('maxAge').value) || Infinity;
-            const minRoom = parseInt(document.getElementById('minRoom').value) || 0;
-            const minHall = parseInt(document.getElementById('minHall').value) || 0;
-            const minBath = parseInt(document.getElementById('minBath').value) || 0;
-            const minFloor = parseInt(document.getElementById('minFloor').value) || -99;
-            const minTotalFloor = parseInt(document.getElementById('minTotalFloor').value) || 0;
+            const filters = {
+                purpose: document.getElementById('filterPurpose').value,
+                minPrice: parseFloat(document.getElementById('minPrice').value) || 0,
+                maxPrice: parseFloat(document.getElementById('maxPrice').value) || Infinity,
+                minSize: parseFloat(document.getElementById('minSize').value) || 0,
+                maxSize: parseFloat(document.getElementById('maxSize').value) || Infinity,
+                minAge: parseFloat(document.getElementById('minAge').value) || 0,
+                maxAge: parseFloat(document.getElementById('maxAge').value) || Infinity,
+                minRoom: parseInt(document.getElementById('minRoom').value) || 0,
+                minHall: parseInt(document.getElementById('minHall').value) || 0,
+                minBath: parseInt(document.getElementById('minBath').value) || 0,
+                minFloor: parseInt(document.getElementById('minFloor').value) || -99,
+                minTotalFloor: parseInt(document.getElementById('minTotalFloor').value) || 0
+            };
 
-            if (!addrA || !addrB) {
-                alert("請輸入雙方的工作地地址！");
-                return;
-            }
-
-            const coordA = await getCoordinates(addrA);
-            if (!coordA) {
-                alert(`無法解析先生的地址：\n"${addrA}"\n\n建議移除「里」或簡化門牌號碼試試。`);
-                return;
-            }
-            
-            // 強制延遲 1.1 秒，以符合 Nominatim 每秒僅限 1 次請求的政策
-            await new Promise(resolve => setTimeout(resolve, 1100));
-            
-            const coordB = await getCoordinates(addrB);
-            if (!coordB) {
-                alert(`無法解析太太的地址：\n"${addrB}"\n\n建議移除「里」或簡化門牌號碼試試。`);
-                return;
+            // 取得所有人座標 (受限 API 速率，多人時會轉圈比較久)
+            const userCoords = [];
+            for (let user of users) {
+                const coord = await getCoordinates(user.address);
+                if (!coord) return alert(`無法解析 ${user.name} 的地址：\n"${user.address}"`);
+                userCoords.push(coord);
+                await new Promise(r => setTimeout(r, 1100)); // 遵循 Nominatim 政策
             }
 
             layerGroup.clearLayers();
 
-            // 1. 標記工作地 A (先生)
-            L.circleMarker(coordA, { color: '#2b6cb0', fillColor: '#2b6cb0', fillOpacity: 0.8, radius: 10 })
-                .addTo(layerGroup).bindPopup("<b>👤 先生工作起點</b>").openPopup();
+            // 1. 計算交集黃金圈圓心 (所有點的平均值)
+            const centerLat = userCoords.reduce((sum, c) => sum + c[0], 0) / users.length;
+            const centerLng = userCoords.reduce((sum, c) => sum + c[1], 0) / users.length;
 
-            // 2. 標記工作地 B (太太)
-            L.circleMarker(coordB, { color: '#319795', fillColor: '#319795', fillOpacity: 0.8, radius: 10 })
-                .addTo(layerGroup).bindPopup("<b>👤 太太工作起點</b>");
+            const averageTime = users.reduce((sum, u) => sum + u.time, 0) / users.length;
+            const radiusInMeters = averageTime * 90; 
 
-            // 3. 計算並畫出雙人通勤的「交集黃金圈」 (此處為模擬演算法：計算兩點的中心點並繪製交集視覺效果)
-            const centerLat = (coordA[0] + coordB[0]) / 2;
-            const centerLng = (coordA[1] + coordB[1]) / 2;
-            const circleCenter = L.latLng(centerLat, centerLng);
-            
-            // 根據兩人設定的忍受時間調整交集圈半徑 (時間越長、半徑越大)
-            const averageTime = (maxTimeA + maxTimeB) / 2;
-            const radiusInMeters = averageTime * 95; 
-
-            const overlapCircle = L.circle([centerLat, centerLng], {
+            // 2. 繪製交集黃金圈 (先畫背景，並設為不可交互以防阻擋點擊)
+            L.circle([centerLat, centerLng], {
                 color: '#48bb78',
                 fillColor: '#48bb78',
                 fillOpacity: 0.15,
                 radius: radiusInMeters,
-                dashArray: '5, 5'
+                dashArray: '5, 5',
+                interactive: false
             }).addTo(layerGroup);
 
-            // 4. 篩選房屋物件 (包含 AI 推薦遞補機制)
+            // 3. 標記所有參與人員工作地 (後畫，確保在交集圈上方)
+            userCoords.forEach((coord, i) => {
+                L.circleMarker(coord, { color: users[i].color, fillColor: users[i].color, fillOpacity: 0.8, radius: 10 })
+                    .addTo(layerGroup).bindPopup(`<b>👤 ${users[i].name} 工作起點</b>`);
+            });
+
+            // 4. 篩選房屋物件
             const houseListDiv = document.getElementById('houseList');
             houseListDiv.innerHTML = '';
             const selectedAmenities = Array.from(document.querySelectorAll('input[name="amenity"]:checked')).map(el => el.value);
             
             const results = [];
+            const circleCenter = L.latLng(centerLat, centerLng);
 
             realHouseData.forEach((item) => {
                 const lat = parseFloat(item.coordinatey2);
@@ -828,8 +891,6 @@
                 const age = item.屋齡 === "NULL" ? 0 : parseFloat(item.屋齡);
                 const hType = parseHouseType(item.HouseType);
                 const floorInfo = parseFloor(item.樓層);
-                const timeA = estimateCommuteTime(houseCoords, coordA, modeA);
-                const timeB = estimateCommuteTime(houseCoords, coordB, modeB);
                 const detectedAmenities = getNearbyAmenities(houseCoords);
                 const missingAmenities = selectedAmenities.filter(a => !detectedAmenities.includes(a));
 
@@ -837,35 +898,46 @@
                 let penalty = 0;
                 let failReasons = [];
 
+                // 計算每個人的通勤時間
+                const userTimes = users.map((u, i) => ({
+                    name: u.name,
+                    time: estimateCommuteTime(houseCoords, userCoords[i], u.mode),
+                    limit: u.time
+                }));
+
                 // 1. 用途篩選
-                if (filterPurpose !== 'all' && item.住宅用途 !== filterPurpose) { 
+                if (filters.purpose !== 'all' && item.住宅用途 !== filters.purpose) { 
                     penalty += 2000; 
-                    failReasons.push(`用途不符(${item.住宅用途})`); 
+                    failReasons.push(`用途不符`); 
                 }
                 
                 // 2. 價格篩選 (太貴或太便宜)
-                if (price > maxPrice) { 
-                    const over = price - maxPrice;
+                if (price > filters.maxPrice) { 
+                    const over = price - filters.maxPrice;
                     penalty += over / 5; 
                     failReasons.push(`總價 ${price} 萬 (超出預算 ${over} 萬)`);
                 }
-                if (price < minPrice && minPrice > 0) { penalty += (minPrice - price) / 10; failReasons.push(`低於預算門檻 ${minPrice - price} 萬`); }
+                if (price < filters.minPrice && filters.minPrice > 0) { penalty += (filters.minPrice - price) / 10; failReasons.push(`低於預算門檻`); }
 
                 // 3. 通勤時間
-                if (timeA > maxTimeA) { penalty += (timeA - maxTimeA) * 40; failReasons.push(`先生通勤 ${timeA} 分 (多出 ${timeA - maxTimeA} 分)`); }
-                if (timeB > maxTimeB) { penalty += (timeB - maxTimeB) * 40; failReasons.push(`太太通勤 ${timeB} 分 (多出 ${timeB - maxTimeB} 分)`); }
+                userTimes.forEach(ut => {
+                    if (ut.time > ut.limit) {
+                        penalty += (ut.time - ut.limit) * 40;
+                        failReasons.push(`${ut.name}通勤 ${ut.time} 分 (多出 ${ut.time - ut.limit} 分)`);
+                    }
+                });
 
                 // 4. 房屋規格
-                if (size < minSize && minSize > 0) { penalty += (minSize - size) * 100; failReasons.push(`坪數不足 ${Math.round(minSize - size)} 坪`); }
-                if (size > maxSize && maxSize < Infinity) { penalty += (size - maxSize) * 10; failReasons.push(`坪數過大`); }
-                if (age > maxAge && maxAge < Infinity) { penalty += (age - maxAge) * 30; failReasons.push(`屋齡較老(${Math.round(age)}年)`); }
+                if (size < filters.minSize && filters.minSize > 0) { penalty += (filters.minSize - size) * 100; failReasons.push(`坪數不足`); }
+                if (size > filters.maxSize && filters.maxSize < Infinity) { penalty += (size - filters.maxSize) * 10; failReasons.push(`坪數過大`); }
+                if (age > filters.maxAge && filters.maxAge < Infinity) { penalty += (age - filters.maxAge) * 30; failReasons.push(`屋齡較老`); }
                 
-                if (hType.room < minRoom) { penalty += (minRoom - hType.room) * 500; failReasons.push(`房間不足(${hType.room}房)`); }
-                if (hType.hall < minHall) { penalty += (minHall - hType.hall) * 200; failReasons.push(`廳數不足(${hType.hall}廳)`); }
-                if (hType.bath < minBath) { penalty += (minBath - hType.bath) * 200; failReasons.push(`衛浴不足(${hType.bath}衛)`); }
+                if (hType.room < filters.minRoom) { penalty += (filters.minRoom - hType.room) * 500; failReasons.push(`房間不足`); }
+                if (hType.hall < filters.minHall) { penalty += (filters.minHall - hType.hall) * 200; failReasons.push(`廳數不足`); }
+                if (hType.bath < filters.minBath) { penalty += (filters.minBath - hType.bath) * 200; failReasons.push(`衛浴不足`); }
 
-                if (floorInfo.start < minFloor && minFloor > -99) { penalty += 300; failReasons.push(`樓層太低(${floorInfo.start}F)`); }
-                if (floorInfo.total < minTotalFloor && minTotalFloor > 0) { penalty += 300; failReasons.push(`總樓高不足`); }
+                if (floorInfo.start < filters.minFloor && filters.minFloor > -99) { penalty += 300; failReasons.push(`樓層太低`); }
+                if (floorInfo.total < filters.minTotalFloor && filters.minTotalFloor > 0) { penalty += 300; failReasons.push(`總樓高不足`); }
 
                 // 5. 機能需求
                 if (missingAmenities.length > 0) { 
@@ -882,7 +954,7 @@
                     }
                 }
 
-                results.push({ item, penalty, failReasons, timeA, timeB, houseCoords, detectedAmenities });
+                results.push({ item, penalty, failReasons, userTimes, houseCoords, detectedAmenities });
             });
 
             // 排序：從最完美的開始排
@@ -895,10 +967,10 @@
                 finalDisplay = finalDisplay.concat(extras);
             }
 
-            const boundsPoints = [coordA, coordB];
+            const boundsPoints = [...userCoords];
 
             finalDisplay.forEach(res => {
-                const { item, penalty, failReasons, timeA, timeB, houseCoords, detectedAmenities } = res;
+                const { item, penalty, failReasons, userTimes, houseCoords, detectedAmenities } = res;
                 const isPerfect = penalty === 0;
                 boundsPoints.push(houseCoords);
                 
@@ -930,8 +1002,7 @@
                         <b>${!isPerfect ? '[AI 推薦] ' : ''}${title}</b><br>
                     總價：${displayPrice}<br>
                     規格：${houseSpecs}<br>
-                    👨 先生：約 ${timeA} 分鐘<br>
-                    👩 太太：約 ${timeB} 分鐘<br>
+                    ${userTimes.map(ut => `👤 ${ut.name}：約 ${ut.time} 分`).join('<br>')}
                     ${reasonHtml}
                     <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:bold; text-decoration:none;">🔗 開啟原始網頁</a>
                     </div>
@@ -951,8 +1022,7 @@
                         <span style="color:var(--dark); font-weight:500; font-size:12px;">${houseSpecs}</span>
                     </div>
                     <div class="house-tags">
-                        <span class="tag tag-time-a">👨 ${timeA} 分</span>
-                        <span class="tag tag-time-b">👩 ${timeB} 分</span>
+                        ${userTimes.map((ut, i) => `<span class="tag" style="background:${users[i].color}1a; color:${users[i].color}">👤 ${ut.time} 分</span>`).join('')}
                         <span class="tag tag-price">💰 ${displayPrice}</span>
                         ${detectedAmenities.slice(0, 2).map(a => `<span class="tag tag-amenity">✨ ${a}</span>`).join('')}
                     </div>
