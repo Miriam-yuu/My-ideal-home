@@ -144,6 +144,30 @@
             margin-top: 12px;
             box-shadow: 0 4px 6px rgba(43, 108, 176, 0.2);
         }
+        
+        /* 標籤頁切換 */
+        .tab-nav {
+            display: flex;
+            background: #edf2f7;
+            padding: 4px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 6px;
+            color: var(--gray);
+        }
+        .tab-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
 
         .btn-calc:hover {
             background: #2b6cb0;
@@ -163,6 +187,7 @@
             padding: 14px;
             margin-bottom: 12px;
             cursor: pointer;
+            position: relative;
             transition: all 0.2s;
         }
 
@@ -171,6 +196,19 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
+
+        .btn-wish {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.2s;
+        }
+        .btn-wish:hover { transform: scale(1.2); }
 
         .house-title {
             font-size: 15px;
@@ -237,6 +275,12 @@
             <p>輸入雙方工作地，一鍵算出生產力最高的黃金居住圈</p>
         </div>
         <div class="content">
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="switchTab('search')">⚡ 智能配對</button>
+                <button class="tab-btn" onclick="switchTab('wishlist')">❤️ 收藏清單 (<span id="wish-count">0</span>)</button>
+            </div>
+
+            <div id="search-section">
             <div class="section-title">Step 1. 輸入通勤起點</div>
             
             <!-- 使用者 A -->
@@ -346,6 +390,13 @@
                 <div class="section-title">Step 4. 黃金交集圈推薦物件</div>
                 <div id="houseList"></div>
             </div>
+            </div>
+
+            <!-- 收藏清單區塊 -->
+            <div id="wishlist-section" style="display: none;">
+                <div class="section-title">我的收藏物件</div>
+                <div id="wishHouseList"></div>
+            </div>
         </div>
     </div>
 
@@ -393,6 +444,96 @@
         const COMMON_AMENITIES = ["便利商店", "健身房、運動中心", "停車方便"];
 
         let realHouseData = [];
+        let wishlist = JSON.parse(localStorage.getItem('my_ideal_wishlist')) || [];
+
+        // 切換標籤頁
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'search') {
+                document.getElementById('search-section').style.display = 'block';
+                document.getElementById('wishlist-section').style.display = 'none';
+            } else {
+                document.getElementById('search-section').style.display = 'none';
+                document.getElementById('wishlist-section').style.display = 'block';
+                renderWishlist();
+            }
+        }
+
+        function updateWishCount() {
+            document.getElementById('wish-count').innerText = wishlist.length;
+        }
+
+        function toggleWish(e, item) {
+            e.stopPropagation();
+            const index = wishlist.findIndex(w => w.網址 === item.網址);
+            const isRemoving = index > -1;
+            
+            if (isRemoving) {
+                wishlist.splice(index, 1);
+            } else {
+                wishlist.push(item);
+            }
+            localStorage.setItem('my_ideal_wishlist', JSON.stringify(wishlist));
+            updateWishCount();
+            
+            // 同步更新所有顯示該物件的愛心圖示 (側邊欄與地圖氣泡)
+            const newIcon = isRemoving ? '🤍' : '❤️';
+            document.querySelectorAll(`button[data-url="${item.網址}"]`).forEach(btn => {
+                btn.innerText = newIcon;
+            });
+
+            if (document.getElementById('wishlist-section').style.display === 'block') {
+                renderWishlist();
+            }
+        }
+
+        function renderWishlist() {
+            const listDiv = document.getElementById('wishHouseList');
+            listDiv.innerHTML = '';
+            if (wishlist.length === 0) {
+                listDiv.innerHTML = '<p style="color:var(--gray); font-size:14px; text-align:center; padding:20px;">目前尚無收藏物件，快去配對看看吧！</p>';
+                return;
+            }
+            wishlist.forEach(item => {
+                // 這裡複用 createHouseCard 邏輯，為了簡潔直接寫入
+                const card = createHouseCard(item, true); 
+                listDiv.appendChild(card);
+            });
+        }
+
+        function createHouseCard(item, isFromWishlist = false) {
+            const lat = parseFloat(item.coordinatey2);
+            const lng = parseFloat(item.coordinatex2);
+            const isSaved = wishlist.some(w => w.網址 === item.網址);
+            
+            const card = document.createElement('div');
+            card.className = 'house-card';
+            
+            const houseSpecs = `${item.HouseType || '規格未填'} | ${item.坪數 === "NULL" ? "坪數不詳" : item.坪數 + " 坪"}`;
+            const displayPrice = item.開價 ? `${item.開價} 萬` : "價格請洽網頁";
+            
+            card.innerHTML = `
+                <button class="btn-wish" data-url="${item.網址}" onclick="toggleWish(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                    ${isSaved ? '❤️' : '🤍'}
+                </button>
+                <div class="house-title">${item.大樓名稱 || item.地址 || '上市物件'}</div>
+                <div class="house-info">${item.地址 || ''}</div>
+                <div class="house-tags">
+                    <span class="tag tag-price">💰 ${displayPrice}</span>
+                    <span class="tag tag-amenity">${houseSpecs}</span>
+                </div>
+            `;
+            
+            card.onclick = () => {
+                if (!isNaN(lat)) {
+                    map.flyTo([lat, lng], 15);
+                    // 此處可擴充開啟 Popup
+                }
+            };
+            return card;
+        }
 
         // 讀取「上市明細.json」
         async function loadListingData() {
@@ -401,6 +542,7 @@
                 if (!response.ok) throw new Error('無法讀取資料檔案');
                 realHouseData = await response.json();
                 console.log('已成功載入資料:', realHouseData.length, '筆');
+                updateWishCount();
             } catch (error) {
                 console.error('載入資料出錯:', error);
                 alert('請確保「上市明細.json」存在於同目錄，並使用 HTTP Server (如 Live Server) 開啟此頁面。');
@@ -696,20 +838,32 @@
                 const url = item.網址 || "#"; 
                 const houseSpecs = `${item.HouseType || '規格未填'} | ${item.坪數 === "NULL" ? "坪數不詳" : item.坪數 + " 坪"} | ${item.屋齡 === "NULL" ? "新成屋" : item.屋齡 + " 年"} | ${item.樓層 || '樓層未填'}`;
                 const reasonHtml = isPerfect ? "" : `<div class="recommend-reason">⚠️ ${failReasons.join('；')}</div>`;
+                const isSaved = wishlist.some(w => w.網址 === item.網址);
+                
+                const wishBtnHtml = `<button class="btn-wish-map" data-url="${item.網址}" onclick="toggleWish(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})" 
+                                             style="background:none; border:none; cursor:pointer; font-size:20px; float:right; padding:0; line-height:1; margin-left:10px;">
+                                             ${isSaved ? '❤️' : '🤍'}
+                                     </button>`;
 
                 houseMarker.bindPopup(`
-                    <b>${!isPerfect ? '[AI 推薦] ' : ''}${title}</b><br>
+                    <div style="min-width:180px">
+                        ${wishBtnHtml}
+                        <b>${!isPerfect ? '[AI 推薦] ' : ''}${title}</b><br>
                     總價：${displayPrice}<br>
                     規格：${houseSpecs}<br>
                     👨 先生：約 ${timeA} 分鐘<br>
                     👩 太太：約 ${timeB} 分鐘<br>
                     ${reasonHtml}
                     <a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary); font-weight:bold; text-decoration:none;">🔗 開啟原始網頁</a>
-                `);
+                    </div>
+                `, { closeButton: true });
 
                 const card = document.createElement('div');
                 card.className = 'house-card';
                 card.innerHTML = `
+                    <button class="btn-wish" data-url="${item.網址}" title="加入收藏清單" onclick="toggleWish(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                        ${isSaved ? '❤️' : '🤍'}
+                    </button>
                     <div class="house-title">
                         ${!isPerfect ? '<span class="tag tag-recommend">🤖 AI 推薦</span> ' : ''}${title}
                     </div>
