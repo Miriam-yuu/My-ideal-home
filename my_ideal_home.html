@@ -52,34 +52,52 @@
             display: none;
         }
 
-        /* 側邊欄切換按鈕 */
-        .toggle-sidebar-btn {
-            position: absolute;
-            right: -24px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 24px;
-            height: 48px;
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-left: none;
-            border-radius: 0 8px 8px 0;
-            cursor: pointer;
-            z-index: 1001;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--gray);
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-        }
-        .toggle-sidebar-btn:hover {
-            color: var(--primary);
-        }
-
         .header {
             padding: 24px;
             background: var(--primary);
             color: white;
+        }
+        
+        .header-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        /* 浮動開啟按鈕 (選單收合時顯示在左上角) */
+        .floating-open-btn {
+            position: fixed;
+            top: 10px; 
+            left: 10px; 
+            z-index: 1001;
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        /* 調整 Leaflet 縮放按鈕位置，讓其位於選單按鈕下方 */
+        .leaflet-top.leaflet-left {
+            margin-top: 50px; /* 10px(預設) + 50px = 60px，與選單按鈕保留 10px 間距 */
         }
 
         .header h1 {
@@ -282,6 +300,15 @@
             height: 100%;
         }
 
+        /* 手機版 RWD 適配 */
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100%;
+                position: fixed;
+                height: 100%;
+            }
+        }
+
         /* 隱私聲明/圖例 */
         .legend {
             position: absolute;
@@ -304,10 +331,13 @@
 <body>
 
     <!-- 左側控制面板 -->
+    <button class="floating-open-btn" id="openBtn" onclick="toggleSidebar()">☰</button>
     <div class="sidebar" id="sidebar">
-        <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="切換選單顯示">◀</button>
         <div class="header">
-            <h1>📍 雙人通勤配對系統</h1>
+            <div class="header-main">
+                <h1>📍 雙人通勤配對系統</h1>
+                <button class="nav-toggle" onclick="toggleSidebar()">☰</button>
+            </div>
             <p>輸入雙方工作地，一鍵算出生產力最高的黃金居住圈</p>
         </div>
         <div class="content">
@@ -485,10 +515,11 @@
         // 側邊欄縮放功能
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const btn = document.querySelector('.toggle-sidebar-btn');
+            const openBtn = document.getElementById('openBtn');
             sidebar.classList.toggle('collapsed');
             
-            btn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            // 根據側邊欄狀態顯示或隱藏外部浮動按鈕
+            openBtn.style.display = sidebar.classList.contains('collapsed') ? 'flex' : 'none';
             
             // 佈局改變後，地圖需要重新計算寬度 (在 transition 結束後執行)
             setTimeout(() => { map.invalidateSize(); }, 300);
