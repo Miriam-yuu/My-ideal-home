@@ -39,6 +39,41 @@
             display: flex;
             flex-direction: column;
             z-index: 1000;
+            transition: width 0.3s ease;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .sidebar.collapsed {
+            width: 0;
+        }
+        .sidebar.collapsed .header, 
+        .sidebar.collapsed .content {
+            display: none;
+        }
+
+        /* 側邊欄切換按鈕 */
+        .toggle-sidebar-btn {
+            position: absolute;
+            right: -24px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 48px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-left: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        }
+        .toggle-sidebar-btn:hover {
+            color: var(--primary);
         }
 
         .header {
@@ -269,7 +304,8 @@
 <body>
 
     <!-- 左側控制面板 -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
+        <button class="toggle-sidebar-btn" onclick="toggleSidebar()" title="切換選單顯示">◀</button>
         <div class="header">
             <h1>📍 雙人通勤配對系統</h1>
             <p>輸入雙方工作地，一鍵算出生產力最高的黃金居住圈</p>
@@ -445,6 +481,18 @@
 
         let realHouseData = [];
         let wishlist = JSON.parse(localStorage.getItem('my_ideal_wishlist')) || [];
+
+        // 側邊欄縮放功能
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const btn = document.querySelector('.toggle-sidebar-btn');
+            sidebar.classList.toggle('collapsed');
+            
+            btn.innerText = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            
+            // 佈局改變後，地圖需要重新計算寬度 (在 transition 結束後執行)
+            setTimeout(() => { map.invalidateSize(); }, 300);
+        }
 
         // 切換標籤頁
         function switchTab(tab) {
