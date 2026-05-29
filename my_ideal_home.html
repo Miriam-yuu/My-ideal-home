@@ -675,7 +675,7 @@
                 <button class="btn-wish" data-url="${item.網址}" onclick="toggleWish(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})">
                     ${isSaved ? '❤️' : '🤍'}
                 </button>
-                <div class="house-title">${item.大樓名稱 || item.地址 || '上市物件'}</div>
+                <div class="house-title">${item.案件名稱 || '上市物件'}</div>
                 <div class="house-info">${item.地址 || ''}</div>
                 <div class="house-tags">
                     <span class="tag tag-price">💰 ${displayPrice}</span>
@@ -699,7 +699,7 @@
                             })
                         }).addTo(layerGroup);
 
-                        const title = `${item.住宅用途 || ''} ${item.大樓名稱 || item.地址 || '上市物件'}`;
+                        const title = `${item.住宅用途 || ''} ${item.案件名稱 || '上市物件'}`;
                         const houseSpecsDetailed = `${item.HouseType || '規格未填'} | ${item.坪數 === "NULL" ? "坪數不詳" : item.坪數 + " 坪"} | ${item.屋齡 === "NULL" ? "新成屋" : item.屋齡 + " 年"} | ${item.樓層 || '樓層未填'}`;
                         const url = item.網址 || "#";
                         const wishBtnHtml = `<button class="btn-wish-map" data-url="${item.網址}" onclick="toggleWish(event, ${JSON.stringify(item).replace(/"/g, '&quot;')})" 
@@ -1040,7 +1040,7 @@
                     })
                 }).addTo(layerGroup);
 
-                const title = `${item.住宅用途 || ''} ${item.大樓名稱 || item.地址 || '上市物件'}`;
+                const title = `${item.住宅用途 || ''} ${item.案件名稱 || '上市物件'}`;
                 const displayPrice = item.開價 ? `${item.開價} 萬` : "價格請洽原始網頁";
                 const url = item.網址 || "#"; 
                 const houseSpecs = `${item.HouseType || '規格未填'} | ${item.坪數 === "NULL" ? "坪數不詳" : item.坪數 + " 坪"} | ${item.屋齡 === "NULL" ? "新成屋" : item.屋齡 + " 年"} | ${item.樓層 || '樓層未填'}`;
@@ -1053,7 +1053,7 @@
                                      </button>`;
 
                 houseMarker.bindPopup(`
-                    <div style="min-width:180px">
+                    <div style="min-width:180px; font-size:13px;">
                         ${wishBtnHtml}
                         <b>${!isPerfect ? '[AI 推薦] ' : ''}${title}</b><br>
                     總價：${displayPrice}<br>
