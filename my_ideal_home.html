@@ -223,6 +223,11 @@
             box-shadow: 0 4px 6px rgba(43, 108, 176, 0.2);
         }
         
+        .btn-calc:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+        }
+
         /* 標籤頁切換 */
         .tab-nav {
             display: flex;
@@ -441,7 +446,7 @@
                 <input type="checkbox" id="parking" name="amenity" value="停車方便" class="amenity-checkbox"><label for="parking" class="amenity-label">🚗 停車方便</label>
             </div>
 
-            <button class="btn-calc" onclick="calculateCommute()">⚡ 開始智能配對</button>
+            <button class="btn-calc" id="calcBtn" onclick="calculateCommute()">⚡ 開始智能配對</button>
 
             <!-- 建議物件結果 -->
             <div class="results-box" id="resultsBox">
@@ -733,8 +738,14 @@
         async function getCoordinates(address) {
             if (!address) return null;
 
-            // 1. 預處理：移除「里」資訊，Nominatim 對里的相容性極差，移除後成功率會大幅提升
-            let cleanAddress = address.replace(/[^\s]{1,3}里/g, '');
+            // 1. 預處理：移除「里」、「鄰」資訊。
+            // 使用正則確保只移除「某某里」，且不破壞前面的「區/市/鎮/鄉」標記
+            let cleanAddress = address.replace(/([區市鎮鄉])([^區市鎮鄉\s]{1,3}里)/g, '$1')
+                                      .replace(/\d+鄰/g, '');
+
+            // 2. 針對台灣地址優化：在縣市、行政區之後加入空白，這能顯著提升 OpenStreetMap/Nominatim 的搜尋成功率
+            // 例如將 "高雄市新興區" 轉換為 "高雄市 新興區 "
+            let spacedAddress = cleanAddress.replace(/^(.*?市|.*?縣)(.*?區|.*?市|.*?鎮|.*?鄉)/, '$1 $2 ');
 
             async function fetchFromAPI(query) {
                 try {
@@ -744,20 +755,24 @@
                 } catch (e) { return null; }
             }
 
-            // 嘗試路徑 A: 預處理後的地址 (推薦)
-            let result = await fetchFromAPI(cleanAddress);
+            // 嘗試路徑 A: 優化後的空格地址 (高雄等南部縣市解析成功率最高)
+            let result = await fetchFromAPI(spacedAddress);
             if (result) return result;
 
-            // 嘗試路徑 B: 原始輸入 (萬一預處理壞了)
+            // 嘗試路徑 B: 移除「里」後的連續地址
+            result = await fetchFromAPI(cleanAddress);
+            if (result) return result;
+
+            // 嘗試路徑 C: 完全原始輸入 (萬一預處理壞了)
             if (cleanAddress !== address) {
                 result = await fetchFromAPI(address);
                 if (result) return result;
             }
 
-            // 嘗試路徑 C: 寬鬆搜尋 (只抓路名，移除號碼與樓層)
+            // 嘗試路徑 D: 寬鬆搜尋 (只抓路段，移除號碼與樓層)
             // 這樣至少能定位在該路段，不會讓整個功能卡住
-            let roadOnly = cleanAddress.replace(/\d+號.*/, '');
-            if (roadOnly !== cleanAddress) {
+            let roadOnly = spacedAddress.replace(/\d+號.*/, '');
+            if (roadOnly !== spacedAddress) {
                 result = await fetchFromAPI(roadOnly);
             }
 
@@ -813,10 +828,14 @@
         let layerGroup = L.layerGroup().addTo(map);
 
         async function calculateCommute() {
+            const calcBtn = document.getElementById('calcBtn');
             // 同步資料至 users 物件
             syncUserData();
 
             if (users.some(u => !u.address)) return alert("請填寫所有人的工作地地址！");
+
+            calcBtn.disabled = true;
+            calcBtn.innerText = "🔍 地址解析中 (◍•ᴗ•◍)";
 
             // 取得物件篩選條件 (非必填：若為空則設為 0 或 Infinity)
             const filters = {
@@ -835,15 +854,23 @@
             };
 
             // 取得所有人座標 (受限 API 速率，多人時會轉圈比較久)
-            const userCoords = [];
-            for (let user of users) {
-                const coord = await getCoordinates(user.address);
-                if (!coord) return alert(`無法解析 ${user.name} 的地址：\n"${user.address}"`);
-                userCoords.push(coord);
-                await new Promise(r => setTimeout(r, 1100)); // 遵循 Nominatim 政策
-            }
+            try {
+                const userCoords = [];
+                for (let user of users) {
+                    const coord = await getCoordinates(user.address);
+                    if (!coord) {
+                        alert(`無法解析 ${user.name} 的地址：\n"${user.address}"\n\n提示：請嘗試輸入更完整的行政區名稱（如：高雄市苓雅區...）`);
+                        calcBtn.disabled = false;
+                        calcBtn.innerText = "⚡ 開始智能配對";
+                        return;
+                    }
+                    userCoords.push(coord);
+                    if (users.indexOf(user) < users.length - 1) {
+                        await new Promise(r => setTimeout(r, 1100)); // 遵循 Nominatim 政策
+                    }
+                }
 
-            layerGroup.clearLayers();
+                layerGroup.clearLayers();
 
             // 1. 計算交集黃金圈圓心 (所有點的平均值)
             const centerLat = userCoords.reduce((sum, c) => sum + c[0], 0) / users.length;
@@ -953,16 +980,16 @@
                     }
                 }
 
-                results.push({ item, penalty, failReasons, userTimes, houseCoords, detectedAmenities });
+                results.push({ item, penalty, failReasons, userTimes, houseCoords, detectedAmenities, distToCenter });
             });
 
             // 排序：從最完美的開始排
             results.sort((a, b) => a.penalty - b.penalty);
 
-            // 邏輯：完全符合者全顯；若不足 3 件則補足 3 件
+            // 邏輯：完全符合者全顯 (penalty 為 0 必然在圈內)
             let finalDisplay = results.filter(r => r.penalty === 0);
             if (finalDisplay.length < 3) {
-                const extras = results.filter(r => r.penalty > 0).slice(0, 3 - finalDisplay.length);
+                const extras = results.filter(r => r.penalty > 0 && r.distToCenter <= 20000).slice(0, 3 - finalDisplay.length);
                 finalDisplay = finalDisplay.concat(extras);
             }
 
@@ -1049,11 +1076,18 @@
             }
 
             if(finalDisplay.length === 0) {
-                houseListDiv.innerHTML = '<p style="color:var(--gray); font-size:14px; text-align:center; padding:20px;">此條件下暫無符合物件，建議放寬預算或通勤時間試試！</p>';
+                houseListDiv.innerHTML = '<p style="color:var(--gray); font-size:14px; text-align:center; padding:20px;">很抱歉，目前附近 20 公里無相符物件 (╥﹏╥)</p>';
             }
 
             // 顯示結果區塊
             document.getElementById('resultsBox').style.display = 'block';
+            } catch (error) {
+                console.error(error);
+                alert("配對過程發生錯誤，請稍後再試。");
+            } finally {
+                calcBtn.disabled = false;
+                calcBtn.innerText = "⚡ 開始智能配對";
+            }
         }
     </script>
 </body>
